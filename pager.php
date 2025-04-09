@@ -1,49 +1,50 @@
 #!/usr/bin/php
 <?php
-// تعیین مسیر فایل صوتی
 $soundFile = '/var/lib/asterisk/sounds/pr/welcome';
+$internalNumbers = ['200', '666', '100', '201', '202', '203', '204', '205', '300', '301']; 
 
-// لیست داخلی‌ها
-$internalNumbers = ['200', '666', '100']; // لیست داخلی‌ها
-
-// بررسی ورودی
 if (empty($internalNumbers)) {
     exit('Internal numbers are required.');
 }
 
-// تنظیمات
 $directory = '/var/spool/asterisk/outgoing/';
-$date = date('YmdHis'); // تاریخ و زمان کنونی
-$callerID = '000-Attention'; // کالر آیدی
-$waitTime = 5; // زمان انتظار
+$callerID = '000-Attention';
+$waitTime = 5;
+$delayBetweenGroups = 10; 
+$groups = array_chunk($internalNumbers, 5);
 
-foreach ($internalNumbers as $internalNumber) {
-    $fileName = $directory . $date . '-' . $internalNumber . '.call'; // نام فایل
-    $channel = 'SIP/' . $internalNumber;
-    $application = 'Playback';
-    $data = $soundFile; // مسیر فایل صوتی
+foreach ($groups as $groupIndex => $group) {
+    $datePrefix = date('YmdHis');
 
-    // محتوای فایل
-    $fileContent = "Channel: $channel\n";
-    $fileContent .= "CallerID: $callerID\n";
-    $fileContent .= "MaxRetries: 2\n"; // تلاش‌های مجدد 
-    $fileContent .= "RetryTime: 30\n"; // زمان انتظار بین تلاش‌ها
-    $fileContent .= "WaitTime: $waitTime\n"; // زمان انتظار قبل از شروع تماس
-    $fileContent .= "Context: default\n"; // کانتکست مورد نظر
-    $fileContent .= "Extension: s\n"; // داخلی مورد نظر
-    $fileContent .= "Priority: 1\n"; // اولویت اجرای تماس
-    $fileContent .= "Application: $application\n";
-    $fileContent .= "Data: $data\n";
+    foreach ($group as $index => $internalNumber) {
+        $fileName = $directory . $datePrefix . '-' . $groupIndex . '-' . $internalNumber . '.call';
+        $channel = 'SIP/' . $internalNumber;
+        $application = 'Playback';
+        $data = $soundFile;
 
-    // نوشتن به فایل
-    if (file_put_contents($fileName, $fileContent) === false) {
-        echo "Failed to create the file for extension $internalNumber.\n";
-        continue;
+        $fileContent = "Channel: $channel\n";
+        $fileContent .= "CallerID: $callerID\n";
+        $fileContent .= "MaxRetries: 2\n";
+        $fileContent .= "RetryTime: 30\n";
+        $fileContent .= "WaitTime: $waitTime\n";
+        $fileContent .= "Context: default\n";
+        $fileContent .= "Extension: s\n";
+        $fileContent .= "Priority: 1\n";
+        $fileContent .= "Application: $application\n";
+        $fileContent .= "Data: $data\n";
+
+        if (file_put_contents($fileName, $fileContent) === false) {
+            echo "Failed to create the file for extension $internalNumber.\n";
+            continue;
+        }
+
+        echo "File created successfully for extension $internalNumber.\n";
     }
-
-    echo "File created successfully for extension $internalNumber.\n";
+    if ($groupIndex < count($groups) - 1) {
+        echo "Waiting $delayBetweenGroups seconds before processing the next group...\n";
+        sleep($delayBetweenGroups);
+    }
 }
 
 exit('All files created successfully.');
-
 ?>
